@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Parc Douae — Poste d'impression</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:#0A1628;color:#E8EEF5;font-family:'Inter',sans-serif;overflow:hidden;}
+
+#wrap{display:flex;flex-direction:column;height:100vh;}
+#header{
+  background:#0D1F3C;border-bottom:1px solid #1E3A5F;padding:18px 28px;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand img{width:42px;height:42px;border-radius:10px;object-fit:contain;}
+.brand .bn{font-family:'Outfit',sans-serif;font-size:19px;font-weight:800;color:#34D399;}
+.brand .bs{font-size:11px;color:#6B7589;margin-top:1px;}
+#status-badge{
+  display:flex;align-items:center;gap:8px;padding:8px 16px;border-radius:30px;
+  background:#064E3B;color:#6EE7B7;font-size:13px;font-weight:700;
+}
+#status-dot{width:8px;height:8px;border-radius:50%;background:#10B981;animation:pulse 1.2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+#clock{font-family:'JetBrains Mono',monospace;color:#6EE7B7;font-size:14px;}
+
+#center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:20px;}
+#center .big-icon img{width:100px;height:100px;object-fit:contain;border-radius:20px;}
+#center .title{font-family:'Outfit',sans-serif;font-size:26px;font-weight:800;color:#34D399;}
+#center .sub{font-size:14px;color:#6B7589;text-align:center;max-width:440px;}
+
+#log-panel{
+  width:100%;max-width:560px;background:#0D1F3C;border:1px solid #1E3A5F;border-radius:18px;
+  padding:18px 20px;max-height:46vh;overflow-y:auto;
+}
+#log-panel h3{font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;color:#6B7589;margin-bottom:12px;}
+.log-item{
+  display:flex;justify-content:space-between;align-items:center;padding:11px 14px;
+  background:#0A1628;border-radius:10px;margin-bottom:8px;animation:slideIn .3s ease;
+}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
+.log-num{font-family:'JetBrains Mono',monospace;font-size:12px;color:#34D399;font-weight:700;}
+.log-info{font-size:12px;color:#6B7589;margin-left:8px;}
+.log-time{font-family:'JetBrains Mono',monospace;font-size:12px;color:#10B981;}
+.log-empty{color:#1E3A5F;text-align:center;padding:30px 10px;font-size:13px;}
+
+#footer{padding:14px 28px;text-align:center;font-size:11.5px;color:#1E3A5F;border-top:1px solid #0D1F3C;flex-shrink:0;}
+
+/* ── PRINT ── */
+#print-area{display:none;}
+@page{size:80mm auto;margin:3mm;}
+@media print{
+  html,body{height:auto!important;overflow:visible!important;}
+  body *{visibility:hidden!important;}
+  #print-area,#print-area *{visibility:visible!important;}
+  #print-area{display:block!important;position:absolute!important;top:0;left:0;width:74mm;max-width:74mm;font-family:'JetBrains Mono',monospace;color:#000;font-size:12px;}
+  .ticket-copy{display:block!important;width:74mm;}
+  .ticket-cut{display:block!important;border-top:1px dashed #000;margin:10px 0;text-align:center;font-size:9px;letter-spacing:2px;}
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="header">
+    <div class="brand">
+      <img src="parc-logo.png" onerror="this.style.display='none'">
+      <div><div class="bn">Parc Des Jeux Douae</div><div class="bs">Poste d'impression</div></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:18px;">
+      <span id="clock">--:--:--</span>
+      <div id="status-badge"><span id="status-dot"></span><span id="status-text">Connexion…</span></div>
+    </div>
+  </div>
+
+  <div id="center">
+    <div class="big-icon"><img src="parc-logo.png" onerror="this.style.fontSize='80px';this.outerHTML='<div style=\'font-size:80px\'>🎠</div>'"></div>
+    <div class="title">Poste d'impression actif</div>
+    <div class="sub">Chaque ticket vendu depuis le téléphone s'imprime automatiquement ici, en double (CLIENT + PARC).</div>
+
+    <div id="log-panel">
+      <h3>Tickets imprimés récemment</h3>
+      <div id="log-list"><div class="log-empty">En attente du premier ticket…</div></div>
+    </div>
+  </div>
+
+  <div id="footer">Laisse cette page ouverte en permanence sur le PC relié à l'imprimante.</div>
+</div>
+
+<div id="print-area"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const SUPABASE_URL="https://ufokwypkwzwucmdjolxj.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmb2t3eXBrd3p3dWNtZGpvbHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MDAwNDAsImV4cCI6MjA5NzI3NjA0MH0.4Pfex_Cpi9n2UtbchwtOHUD1Kk8Rc1l3bu9hn44Lu6U";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const PARC_NAME="Parc Des Jeux Douae";
+
+function pad(n){return String(n).padStart(2,"0");}
+function dh(n){return (Number(n)||0).toFixed(2).replace(".",",")+" DH";}
+
+function tick(){
+  const d=new Date();
+  document.getElementById("clock").textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+setInterval(tick,1000);tick();
+
+function setStatus(ok,text){
+  const dot=document.getElementById("status-dot");
+  const badge=document.getElementById("status-badge");
+  const t=document.getElementById("status-text");
+  t.textContent=text;
+  if(ok){badge.style.background="#064E3B";badge.style.color="#6EE7B7";dot.style.background="#10B981";}
+  else{badge.style.background="#7F1D1D";badge.style.color="#FCA5A5";dot.style.background="#EF4444";}
+}
+
+const printed=new Set();
+const logEntries=[];
+
+function addLog(num,info){
+  logEntries.unshift({num,info,time:new Date()});
+  if(logEntries.length>30)logEntries.pop();
+  const wrap=document.getElementById("log-list");
+  wrap.innerHTML=logEntries.map(e=>`
+    <div class="log-item">
+      <div><span class="log-num">${e.num}</span><span class="log-info">${e.info}</span></div>
+      <span class="log-time">${pad(e.time.getHours())}:${pad(e.time.getMinutes())}</span>
+    </div>`).join("");
+}
+
+function tarifIcon(label){
+  const l=label.toLowerCase();
+  if(l.includes("enfant"))return "👦";
+  if(l.includes("adulte"))return "👨";
+  return "🎟️";
+}
+
+function buildTicketHTML(tk,items,agent,label){
+  const d=new Date(tk.created_at||Date.now());
+  const totalPersonnes=items.reduce((s,i)=>s+i.qty,0);
+  return `<div class="ticket-copy">
+    <div style="text-align:center;margin-bottom:8px;">
+      <div style="font-size:16px;font-weight:700;">🎠 ${PARC_NAME}</div>
+      <div>${tk.ticket_number}</div>
+      <div>${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} — ${pad(d.getHours())}:${pad(d.getMinutes())}</div>
+      <div>Agent : ${agent}</div>
+    </div>
+    <hr>
+    <div style="font-weight:700;text-align:center;margin:5px 0;">${totalPersonnes} PERSONNE${totalPersonnes>1?"S":""}</div>
+    <hr>
+    ${items.map(i=>`<div style="display:flex;justify-content:space-between;padding:2px 0;">${tarifIcon(i.tarif_label)} ${i.tarif_label} ×${i.qty}<span>${dh(i.subtotal)}</span></div>`).join("")}
+    <hr>
+    <div style="display:flex;justify-content:space-between;font-weight:700;font-size:14px;"><span>TOTAL</span><span>${dh(tk.total)}</span></div>
+    <div style="font-size:11px;margin-top:4px;">Paiement : ${tk.payment_method||"—"}</div>
+    ${tk.note?`<div style="font-size:11px;margin-top:3px;">📝 ${tk.note}</div>`:""}
+    <hr>
+    <div style="text-align:center;font-size:11px;">Merci de votre visite ! 🎠</div>
+    <div style="text-align:center;font-size:10px;margin-top:3px;">${label}</div>
+  </div>`;
+}
+
+async function handleNewTicket(tk){
+  if(printed.has(tk.id))return;
+  printed.add(tk.id);
+
+  const {data:items}=await sb.from("parc_ticket_items").select("*").eq("ticket_id",tk.id);
+  let agent="—";
+  if(tk.employee_id){
+    const {data:emp}=await sb.from("parc_employees").select("name").eq("id",tk.employee_id).single();
+    agent=emp?.name||"—";
+  }
+
+  const copy1=buildTicketHTML(tk,items||[],agent,"★ CLIENT ★");
+  const cut=`<div class="ticket-cut">- - - - - DECOUPER ICI - - - - -</div>`;
+  const copy2=buildTicketHTML(tk,items||[],agent,"★ PARC ★");
+  document.getElementById("print-area").innerHTML=copy1+cut+copy2;
+  window.print();
+
+  await sb.from("parc_tickets").update({printed:true}).eq("id",tk.id);
+  const totalP=(items||[]).reduce((s,i)=>s+i.qty,0);
+  addLog(tk.ticket_number,`${totalP} pers. · ${dh(tk.total)}`);
+}
+
+async function catchUp(){
+  // Rattraper les tickets non imprimés du jour
+  const start=new Date();start.setHours(4,0,0,0);
+  const {data}=await sb.from("parc_tickets").select("*")
+    .eq("printed",false).gte("created_at",start.toISOString()).order("created_at",{ascending:true});
+  for(const tk of (data||[])){
+    await handleNewTicket(tk);
+    await new Promise(r=>setTimeout(r,800));
+  }
+}
+
+async function init(){
+  setStatus(true,"Connexion…");
+  await catchUp();
+  sb.channel("parc-print-"+Date.now())
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"parc_tickets"},payload=>{
+      handleNewTicket(payload.new);
+    })
+    .subscribe(status=>{
+      if(status==="SUBSCRIBED")setStatus(true,"Connecté — en écoute");
+      else if(status==="CHANNEL_ERROR"||status==="TIMED_OUT")setStatus(false,"Connexion perdue");
+    });
+}
+init();
+</script>
+</body>
+</html>
